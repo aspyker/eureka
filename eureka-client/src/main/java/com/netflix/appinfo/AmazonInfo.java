@@ -58,15 +58,26 @@ public class AmazonInfo implements DataCenterInfo, UniqueIdentifier {
     private static DynamicIntProperty awsMetaDataReadTimeout;
     private static DynamicIntProperty awsMetaDataConnectTimeout;
     private static DynamicIntProperty awsMetaDataRetries;
+    private static String titusTaskId = null;
 
     private static final String AWS_API_VERSION = "latest";
     private static final String AWS_METADATA_URL = "http://169.254.169.254/"
             + AWS_API_VERSION + "/meta-data/";
 
     public enum MetaDataKey {
-        amiId("ami-id"),
+        amiId("ami-id") {
+            @Override
+            public boolean neededForContainers() {
+                return false;
+            }
+        },
         instanceId("instance-id"),
-        instanceType("instance-type"),
+        instanceType("instance-type") {
+            @Override
+            public boolean neededForContainers () {
+                return false;
+            }
+        },
         localIpv4("local-ipv4"),
         localHostname("local-hostname"),
         availabilityZone("availability-zone", "placement/"),
@@ -130,6 +141,10 @@ public class AmazonInfo implements DataCenterInfo, UniqueIdentifier {
             return new URL(AWS_METADATA_URL + path + name);
         }
 
+        public boolean neededForContainers() {
+            return true;
+        }
+
         protected String read(InputStream inputStream) throws IOException {
             BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
             String toReturn;
@@ -188,6 +203,15 @@ public class AmazonInfo implements DataCenterInfo, UniqueIdentifier {
         public AmazonInfo autoBuild(String namespace) {
             initProperties(namespace);
             for (MetaDataKey key : MetaDataKey.values()) {
+                if (titusTaskId != null) {
+                    if (!key.neededForContainers()) {
+                        continue;
+                    }
+                    if (key.equals(MetaDataKey.instanceId)) {
+                        result.metadata.put(key.getName(), titusTaskId);
+                        continue;
+                    }
+                }
                 int numOfRetries = awsMetaDataRetries.get();
                 while (numOfRetries-- > 0) {
                     try {
@@ -256,6 +280,7 @@ public class AmazonInfo implements DataCenterInfo, UniqueIdentifier {
                         .getInstance().getIntProperty(namespace + "mt.num_retries",
                                 3);
             }
+            titusTaskId = System.getenv("TITUS_TASK_ID");
         }
     }
 

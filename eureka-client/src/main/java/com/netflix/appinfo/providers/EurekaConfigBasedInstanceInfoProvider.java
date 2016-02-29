@@ -107,6 +107,12 @@ public class EurekaConfigBasedInstanceInfoProvider implements Provider<InstanceI
                 builder.add(key, value);
             }
 
+            // Add the ec2InstanceId in the case of containers
+            String containerId = System.getenv("TITUS_TASK_ID");
+            if (containerId != null) {
+                builder.add("ec2InstanceId", System.getenv("EC2_INSTANCE_ID"));
+            }
+
             instanceInfo = builder.build();
             instanceInfo.setLeaseInfo(leaseInfoBuilder.build());
         }
